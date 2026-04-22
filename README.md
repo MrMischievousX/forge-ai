@@ -99,4 +99,4 @@ The gap Forge AI fills: none of the above let you dispatch an AI coding task fro
 
 ## Live Demo
 
-[forge-ai landing page](https://mrmischievousx.github.io/forge-ai/)
+[Checkout](https://mrmischievousx.github.io/forge-ai/)
