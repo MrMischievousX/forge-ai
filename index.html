@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forge AI — Your codebase, in your pocket.</title>
+  <meta name="description" content="AI coding tasks that run on GitHub Actions while you sleep. Browse issues, dispatch the AI, review the PR. All from your phone.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    /* ── RESET ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: #0d1117; color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      line-height: 1.6; overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    img, svg { display: block; }
+
+    /* ── TOKENS ────────────────────────────────────── */
+    :root {
+      --bg:      #0d1117; --srf:    #161b22;
+      --srf2:    #21262d; --bdr:    #30363d;
+      --t1:      #e6edf3; --t2:     #7d8590; --t3: #484f58;
+      --blue:    #388bfd; --green:  #3fb950;
+      --yellow:  #d29922; --red:    #f85149; --purple: #bc8cff;
+      --fd: 'Instrument Sans', sans-serif;
+      --fm: 'JetBrains Mono', monospace;
+    }
+
+    /* ── LAYOUT ────────────────────────────────────── */
+    .container { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+    .section    { padding: 96px 0; }
+
+    /* ── TYPOGRAPHY ────────────────────────────────── */
+    .section-tag {
+      display: block; font-family: var(--fm);
+      font-size: 10px; font-weight: 600;
+      letter-spacing: .14em; text-transform: uppercase;
+      color: var(--t3); margin-bottom: 14px;
+    }
+    .section-title {
+      font-family: var(--fd); font-size: clamp(26px,3.4vw,44px);
+      font-weight: 700; letter-spacing: -.025em; line-height: 1.1; color: var(--t1);
+    }
+    .section-sub {
+      font-size: 16px; color: var(--t2); margin-top: 12px; line-height: 1.7;
+    }
+
+    /* ── REVEAL ────────────────────────────────────── */
+    .reveal { opacity: 0; transform: translateY(20px); transition: opacity .6s ease, transform .6s ease; }
+    .reveal.in { opacity: 1; transform: none; }
+    .d1{transition-delay:.08s} .d2{transition-delay:.16s}
+    .d3{transition-delay:.24s} .d4{transition-delay:.32s}
+    .d5{transition-delay:.40s} .d6{transition-delay:.48s}
+
+    /* ── KEYFRAMES ─────────────────────────────────── */
+    @keyframes pulse-green { 0%,100%{box-shadow:0 0 0 0 rgba(63,185,80,.5)} 50%{box-shadow:0 0 0 5px rgba(63,185,80,0)} }
+    @keyframes pulse-blue  { 0%,100%{box-shadow:0 0 0 0 rgba(56,139,253,.5)} 50%{box-shadow:0 0 0 5px rgba(56,139,253,0)} }
+    @keyframes dot-grid    { from{background-position:0 0} to{background-position:32px 32px} }
+    @keyframes float       { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+    @keyframes scan        { 0%{top:-80px;opacity:0} 8%{opacity:1} 92%{opacity:1} 100%{top:100%;opacity:0} }
+    @keyframes blink       { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+    @keyframes glow-breathe{ 0%,100%{opacity:.45} 50%{opacity:.9} }
+    @keyframes label-slide { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:none} }
+
+    /* ── NAV ───────────────────────────────────────── */
+    #nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      transition: background .3s, box-shadow .3s;
+    }
+    #nav.scrolled {
+      background: rgba(13,17,23,.84);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 1px 0 var(--bdr);
+    }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 3px; width: 26px; height: 26px; }
+    .logo-grid i { border-radius: 5px; display: block; }
+    .logo-grid i:nth-child(1) { background: #388bfd; }
+    .logo-grid i:nth-child(2) { background: #bc8cff; }
+    .logo-grid i:nth-child(3) { background: rgba(188,140,255,.55); }
+    .logo-grid i:nth-child(4) { background: rgba(56,139,253,.35); }
+    .logo-name { font-family: var(--fd); font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+    .nav-links { display: flex; align-items: center; gap: 28px; list-style: none; }
+    .nav-links a { font-size: 14px; color: var(--t2); transition: color .2s; }
+    .nav-links a:hover { color: var(--t1); }
+    .btn-nav {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--blue); color: #fff;
+      font-size: 14px; font-weight: 600; padding: 8px 18px;
+      border-radius: 8px; transition: opacity .2s, transform .2s;
+    }
+    .btn-nav:hover { opacity: .88; transform: translateY(-1px); }
+
+    /* ── HERO ──────────────────────────────────────── */
+    .hero {
+      min-height: 100vh; display: flex; align-items: center;
+      position: relative; overflow: hidden; padding: 100px 0 80px;
+    }
+    .hero-dots {
+      position: absolute; inset: 0; z-index: 0;
+      background-image: radial-gradient(circle, rgba(56,139,253,.10) 1px, transparent 1px);
+      background-size: 32px 32px;
+      animation: dot-grid 12s linear infinite;
+    }
+    .hero-dots::after {
+      content: ''; position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 65% 55% at 78% 50%, rgba(188,140,255,.08) 0%, transparent 60%),
+        radial-gradient(ellipse 45% 65% at 18% 35%, rgba(56,139,253,.07) 0%, transparent 55%),
+        linear-gradient(to bottom, transparent 65%, var(--bg) 100%);
+    }
+    .hero-inner {
+      position: relative; z-index: 1;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 56px; align-items: center;
+    }
+
+    /* hero text */
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 5px 12px; border-radius: 100px;
+      border: 1px solid rgba(56,139,253,.28);
+      background: rgba(56,139,253,.05);
+      margin-bottom: 22px;
+    }
+    .eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); animation: pulse-blue 2s ease-in-out infinite; }
+    .eyebrow span { font-family: var(--fm); font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--blue); }
+    h1 {
+      font-family: var(--fd); font-size: clamp(36px,4.8vw,62px);
+      font-weight: 700; letter-spacing: -.03em; line-height: 1.06; margin-bottom: 20px;
+    }
+    h1 em {
+      font-style: normal;
+      background: linear-gradient(130deg, var(--blue) 20%, var(--purple) 80%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .hero-sub { font-size: 18px; color: var(--t2); line-height: 1.65; margin-bottom: 32px; height: 68px; overflow: hidden; }
+    #tw-cursor { display: inline-block; width: 2px; height: 1.05em; background: var(--blue); vertical-align: middle; margin-left: 2px; animation: blink 1s step-end infinite; }
+
+    /* hero badges */
+    .hero-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-family: var(--fm); font-size: 10px; font-weight: 600;
+      letter-spacing: .06em; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 6px; border: 1px solid var(--bdr);
+      color: var(--t2);
+    }
+    .hero-badge.green { border-color: rgba(63,185,80,.3); color: var(--green); background: rgba(63,185,80,.06); }
+    .hero-badge.blue  { border-color: rgba(56,139,253,.3); color: var(--blue);  background: rgba(56,139,253,.06); }
+
+    .hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--blue); color: #fff;
+      font-size: 15px; font-weight: 600; padding: 13px 24px;
+      border-radius: 10px; transition: all .2s;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(56,139,253,.35); }
+    .btn-outline {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: transparent; color: var(--t2);
+      font-size: 15px; font-weight: 500; padding: 13px 24px;
+      border-radius: 10px; border: 1px solid var(--bdr); transition: all .2s;
+    }
+    .btn-outline:hover { color: var(--t1); border-color: var(--t3); transform: translateY(-2px); }
+
+    /* ── PHONE ─────────────────────────────────────── */
+    .hero-visual { display: flex; justify-content: center; align-items: center; position: relative; }
+    .phone-glow {
+      position: absolute; width: 310px; height: 400px;
+      background: radial-gradient(ellipse, rgba(188,140,255,.22) 0%, transparent 70%);
+      border-radius: 50%; filter: blur(48px);
+      animation: glow-breathe 4s ease-in-out infinite;
+    }
+    .phone-wrap { position: relative; animation: float 6s ease-in-out infinite; }
+    .phone {
+      width: 270px; height: 570px; border-radius: 44px;
+      border: 2px solid var(--bdr);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 36px 80px rgba(0,0,0,.7);
+      background: var(--bg); position: relative; overflow: hidden;
+    }
+    .dyn-island { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 114px; height: 32px; background: #000; border-radius: 20px; z-index: 10; }
+    .scan-line {
+      position: absolute; left: 0; right: 0; height: 90px; z-index: 5; top: 0;
+      background: linear-gradient(to bottom, transparent 0%, rgba(56,139,253,.05) 30%, rgba(56,139,253,.10) 50%, rgba(56,139,253,.05) 70%, transparent 100%);
+      animation: scan 4s ease-in-out infinite; pointer-events: none;
+    }
+    .phone-screen { position: absolute; inset: 0; background: var(--bg); padding-top: 56px; overflow: hidden; }
+    .ph-sb { display: flex; justify-content: space-between; padding: 0 18px 6px; font-family: var(--fm); font-size: 9px; color: var(--t2); }
+    .ph-hd { display: flex; align-items: center; justify-content: space-between; padding: 4px 18px 10px; }
+    .ph-title { font-family: var(--fd); font-size: 20px; font-weight: 700; }
+    .ph-bell { width: 26px; height: 26px; border-radius: 8px; background: var(--srf2); display: flex; align-items: center; justify-content: center; }
+    .ph-lbl { font-family: var(--fm); font-size: 8px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--t3); padding: 0 16px 6px; }
+    .ph-task { margin: 0 10px 8px; background: var(--srf); border: 1px solid var(--bdr); border-radius: 12px; padding: 11px 12px; }
+    .ph-task-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+    .ph-task-name { font-size: 11px; font-weight: 600; flex: 1; }
+    .ph-task-st { display: flex; align-items: center; gap: 4px; font-family: var(--fm); font-size: 8px; color: var(--green); }
+    .sdot { width: 6px; height: 6px; border-radius: 50%; }
+    .sdot.run { background: var(--green); animation: pulse-green 2s ease-in-out infinite; }
+    .sdot.pln { background: var(--yellow); }
+    .ph-meta { display: flex; gap: 4px; font-family: var(--fm); font-size: 8px; color: var(--t3); margin-bottom: 7px; }
+    .ph-meta span { color: var(--blue); }
+    .ph-bar { height: 2px; background: var(--srf2); border-radius: 2px; overflow: hidden; }
+    .ph-bar-fill { height: 100%; background: linear-gradient(90deg, var(--blue), var(--purple)); border-radius: 2px; }
+
+    /* timeline inside phone */
+    .ph-tl { margin: 0 10px 8px; background: var(--srf); border: 1px solid var(--bdr); border-radius: 12px; padding: 10px 11px; }
+    .ph-tl-row { display: flex; align-items: center; gap: 7px; padding: 2px 0; font-family: var(--fm); font-size: 8px; color: var(--t2); }
+    .ph-tl-ic { width: 12px; text-align: center; color: var(--t3); flex-shrink: 0; }
+    .ph-tl-txt { flex: 1; }
+    .ph-tl-ck { color: var(--green); }
+    .ph-tl-row.active .ph-tl-ic { color: var(--blue); }
+    .ph-tl-row.active .ph-tl-txt { color: var(--t1); }
+
+    .ph-pr { margin: 0 10px 6px; background: var(--srf); border: 1px solid var(--bdr); border-radius: 10px; padding: 9px 11px; display: flex; align-items: center; gap: 9px; }
+    .ph-pr-ic { width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .ph-pr-body { flex: 1; min-width: 0; }
+    .ph-pr-name { font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ph-pr-meta { display: flex; gap: 4px; margin-top: 2px; }
+    .bdg { font-family: var(--fm); font-size: 7.5px; font-weight: 600; padding: 1px 5px; border-radius: 4px; }
+    .bdg-g { background: rgba(63,185,80,.15); color: var(--green); }
+    .bdg-y { background: rgba(210,153,34,.15); color: var(--yellow); }
+    .bdg-b { background: rgba(56,139,253,.15); color: var(--blue); }
+    .bdg-r { background: rgba(248,81,73,.15); color: var(--red); }
+    .bdg-p { background: rgba(188,140,255,.15); color: var(--purple); }
+
+    /* ── STATS BAR ─────────────────────────────────── */
+    .stats-bar { background: var(--srf); border-top: 1px solid var(--bdr); border-bottom: 1px solid var(--bdr); }
+    .stats-inner { display: grid; grid-template-columns: repeat(4,1fr); }
+    .stat { padding: 26px 20px; text-align: center; border-right: 1px solid var(--bdr); }
+    .stat:last-child { border-right: none; }
+    .stat-val { display: block; font-family: var(--fm); font-size: 24px; font-weight: 600; letter-spacing: -.02em; }
+    .stat-lbl { display: block; font-size: 12px; color: var(--t3); margin-top: 4px; }
+
+    /* ── HOW IT WORKS ──────────────────────────────── */
+    .hiw-grid { display: grid; grid-template-columns: 1fr 56px 1fr 56px 1fr; gap: 0; margin-top: 56px; align-items: start; }
+    .hiw-step {}
+    .step-num { font-family: var(--fm); font-size: 10px; font-weight: 600; color: var(--t3); letter-spacing: .1em; margin-bottom: 14px; }
+    .step-icon { width: 46px; height: 46px; border-radius: 13px; border: 1px solid var(--bdr); background: var(--srf); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; transition: border-color .3s, background .3s; }
+    .hiw-step:hover .step-icon { border-color: var(--blue); background: rgba(56,139,253,.08); }
+    .step-h { font-family: var(--fd); font-size: 17px; font-weight: 700; letter-spacing: -.01em; margin-bottom: 8px; }
+    .step-p { font-size: 13.5px; color: var(--t2); line-height: 1.65; }
+    .hiw-conn { display: flex; align-items: center; justify-content: center; padding-top: 68px; }
+    .hiw-arr { display: flex; align-items: center; }
+    .hiw-arr-line { width: 20px; height: 1px; background: var(--bdr); }
+
+    /* Actions badge in step 2 */
+    .actions-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-family: var(--fm); font-size: 8.5px; font-weight: 600;
+      letter-spacing: .06em; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 5px; border: 1px solid rgba(63,185,80,.3);
+      color: var(--green); background: rgba(63,185,80,.06); margin-top: 10px;
+    }
+    .actions-badge-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); animation: pulse-green 2s ease-in-out infinite; }
+
+    .mini-tl { margin-top: 14px; background: var(--srf); border: 1px solid var(--bdr); border-radius: 9px; padding: 9px 12px; font-family: var(--fm); font-size: 8.5px; color: var(--t3); }
+    .mini-tl-row { display: flex; align-items: center; gap: 7px; padding: 2.5px 0; }
+    .mini-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── FEATURES GRID ─────────────────────────────── */
+    .feat-outer { margin-top: 52px; }
+    .feat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: auto auto auto;
+      gap: 1px; background: var(--bdr);
+      border: 1px solid var(--bdr); border-radius: 14px;
+      overflow: hidden;
+    }
+    /* Asymmetric row 1: card 1 = 1col, card 2 = 2col */
+    .feat-card:nth-child(1) { grid-column: span 1; }
+    .feat-card:nth-child(2) { grid-column: span 2; }
+    /* Row 2: 3 equal */
+    .feat-card:nth-child(3),
+    .feat-card:nth-child(4),
+    .feat-card:nth-child(5) { grid-column: span 1; }
+    /* Row 3: GitHub Native full width */
+    .feat-card:nth-child(6) { grid-column: 1 / -1; }
+
+    .feat-card { background: var(--srf); padding: 28px 30px; position: relative; overflow: hidden; transition: background .2s; }
+    .feat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; opacity: 0; transition: opacity .3s; }
+    .feat-card:hover { background: var(--srf2); }
+    .feat-card:hover::before { opacity: 1; }
+    .fa-blue::before   { background: var(--blue); }
+    .fa-green::before  { background: var(--green); }
+    .fa-yellow::before { background: var(--yellow); }
+    .fa-purple::before { background: var(--purple); }
+    .fa-teal::before   { background: #38bdf8; }
+    .fa-red::before    { background: var(--red); }
+
+    .feat-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+    .fi-blue   { background: rgba(56,139,253,.14); color: var(--blue); }
+    .fi-green  { background: rgba(63,185,80,.14); color: var(--green); }
+    .fi-yellow { background: rgba(210,153,34,.14); color: var(--yellow); }
+    .fi-purple { background: rgba(188,140,255,.14); color: var(--purple); }
+    .fi-teal   { background: rgba(56,189,248,.14); color: #38bdf8; }
+    .fi-red    { background: rgba(248,81,73,.14); color: var(--red); }
+
+    .feat-h { font-family: var(--fd); font-size: 15px; font-weight: 700; letter-spacing: -.01em; margin-bottom: 8px; }
+    .feat-p { font-size: 13px; color: var(--t2); line-height: 1.65; }
+
+    /* GitHub Native full-width card extras */
+    .feat-card:nth-child(6) {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: center;
+    }
+    .feat-card:nth-child(6) .feat-left {}
+    .feat-card:nth-child(6) .feat-right {}
+
+    .label-flow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+    .lbl-chip {
+      font-family: var(--fm); font-size: 9px; font-weight: 600;
+      padding: 3px 9px; border-radius: 100px; border: 1px solid;
+      opacity: 0; animation: label-slide .4s ease forwards;
+    }
+    .lbl-chip.pending  { border-color: rgba(210,153,34,.35); color: var(--yellow); animation-delay: .1s; }
+    .lbl-chip.planning { border-color: rgba(56,139,253,.35); color: var(--blue);   animation-delay: .2s; }
+    .lbl-chip.executing{ border-color: rgba(63,185,80,.35);  color: var(--green);  animation-delay: .3s; }
+    .lbl-chip.pr-ready { border-color: rgba(188,140,255,.35);color: var(--purple); animation-delay: .4s; }
+    .lbl-chip.done     { border-color: rgba(63,185,80,.35);  color: var(--green);  animation-delay: .5s; }
+
+    .label-flow-arr { color: var(--t3); font-size: 11px; align-self: center; padding-top: 2px; }
+
+    .arch-note {
+      font-family: var(--fm); font-size: 11px; color: var(--t2); line-height: 1.8;
+    }
+    .arch-note .hi { color: var(--t1); font-weight: 500; }
+    .arch-note .dim { color: var(--t3); }
+
+    /* ── TERMINAL SECTION ──────────────────────────── */
+    .term-section {
+      background: #07090e; border-top: 1px solid var(--bdr); border-bottom: 1px solid var(--bdr);
+      padding: 96px 0; position: relative; overflow: hidden;
+    }
+    .term-section::before {
+      content: ''; position: absolute; top: -120px; left: 50%; transform: translateX(-50%);
+      width: 600px; height: 350px;
+      background: radial-gradient(ellipse, rgba(56,139,253,.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* GitHub comment frame wrapping terminal */
+    .gh-comment-frame {
+      border: 1px solid var(--bdr); border-radius: 8px; overflow: hidden;
+      margin-top: 48px;
+      box-shadow: 0 24px 64px rgba(0,0,0,.6);
+    }
+    .gh-comment-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px; background: rgba(22,27,34,.8);
+      border-bottom: 1px solid var(--bdr);
+    }
+    .gh-avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--fm); font-size: 10px; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+    }
+    .gh-comment-meta { font-size: 13px; color: var(--t2); flex: 1; }
+    .gh-comment-meta strong { color: var(--t1); font-weight: 600; }
+    .gh-comment-issue { font-family: var(--fm); font-size: 11px; color: var(--t3); }
+
+    .term-window { background: #090d13; border: none; overflow: hidden; }
+    .term-bar { display: flex; align-items: center; gap: 7px; padding: 11px 16px; background: var(--srf); border-bottom: 1px solid var(--bdr); }
+    .td { width: 12px; height: 12px; border-radius: 50%; }
+    .td-r { background: #ff5f57; } .td-y { background: #febc2e; } .td-g { background: #28c840; }
+    .term-title { font-family: var(--fm); font-size: 11px; color: var(--t3); margin-left: 8px; }
+
+    .term-tokens { display: flex; align-items: center; gap: 14px; padding: 11px 20px; border-bottom: 1px solid rgba(48,54,61,.5); }
+    .tok { font-family: var(--fm); font-size: 11.5px; color: var(--t2); }
+    .tok strong { color: var(--t1); font-weight: 500; }
+    .tok-g strong { color: var(--green); }
+    .ctx-wrap { flex: 1; max-width: 140px; }
+    .ctx-bar { height: 4px; background: var(--srf2); border-radius: 3px; overflow: hidden; }
+    .ctx-fill { height: 100%; width: 65%; background: linear-gradient(90deg, var(--blue), var(--purple)); }
+
+    .term-body { padding: 18px 20px; font-family: var(--fm); font-size: 12.5px; line-height: 2.1; }
+    .tl-row { display: flex; align-items: center; gap: 10px; }
+    .tl-ic { width: 14px; text-align: center; flex-shrink: 0; color: var(--t3); font-size: 11px; }
+    .tl-txt { flex: 1; color: var(--t2); }
+    .tl-diff { font-size: 10.5px; }
+    .tl-diff .add { color: var(--green); } .tl-diff .rem { color: var(--red); }
+    .tl-t { color: var(--t3); font-size: 10.5px; min-width: 32px; text-align: right; }
+    .tl-ck { color: var(--green); font-size: 11px; }
+    .tl-row.active { background: rgba(56,139,253,.05); border-radius: 6px; padding: 2px 6px; margin: 0 -6px; }
+    .tl-row.active .tl-ic { color: var(--blue); }
+    .tl-row.active .tl-txt { color: var(--t1); }
+    .active-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); animation: pulse-blue 1.5s ease-in-out infinite; box-shadow: 0 0 7px rgba(56,139,253,.7); }
+
+    .term-diff { border-top: 1px solid var(--bdr); padding: 14px 20px; font-family: var(--fm); font-size: 11.5px; }
+    .diff-file { font-size: 10.5px; color: var(--t3); margin-bottom: 7px; }
+    .dl { display: flex; line-height: 1.85; }
+    .dl-n { min-width: 28px; color: var(--t3); font-size: 9.5px; opacity: .45; user-select: none; }
+    .dl-s { width: 12px; flex-shrink: 0; }
+    .dl-c { flex: 1; }
+    .dl.ctx .dl-c { color: var(--t2); } .dl.ctx .dl-s { color: var(--t3); }
+    .dl.rem { background: rgba(248,81,73,.07); } .dl.rem .dl-c { color: var(--red); } .dl.rem .dl-s { color: var(--red); }
+    .dl.add { background: rgba(63,185,80,.07); } .dl.add .dl-c { color: var(--green); } .dl.add .dl-s { color: var(--green); }
+
+    /* ── PRICING ───────────────────────────────────── */
+    .pricing-hd { text-align: center; margin-bottom: 52px; }
+    .pricing-hd .section-sub { margin: 12px auto 0; text-align: center; }
+    .pricing-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 760px; margin: 0 auto; }
+    .p-card { background: var(--srf); border: 1px solid var(--bdr); border-radius: 18px; padding: 32px; }
+    .p-card.feat { border-color: rgba(56,139,253,.4); background: linear-gradient(145deg, rgba(56,139,253,.06) 0%, var(--srf) 55%); }
+    .p-name { font-family: var(--fm); font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--t3); margin-bottom: 8px; }
+    .p-price { font-family: var(--fd); font-size: 40px; font-weight: 700; letter-spacing: -.03em; margin-bottom: 4px; }
+    .p-price-sub { font-size: 12px; color: var(--t3); margin-bottom: 24px; }
+    .p-features { list-style: none; display: flex; flex-direction: column; gap: 11px; }
+    .p-features li { display: flex; align-items: flex-start; gap: 9px; font-size: 13.5px; color: var(--t2); }
+    .p-check { color: var(--green); flex-shrink: 0; margin-top: 1px; }
+    .p-dot { color: var(--t3); flex-shrink: 0; }
+    .pricing-note { text-align: center; margin-top: 32px; font-family: var(--fm); font-size: 12px; color: var(--t3); }
+
+    /* ── CTA ───────────────────────────────────────── */
+    .cta-sect { padding: 116px 0; background: #07090e; position: relative; overflow: hidden; text-align: center; }
+    .cta-glow { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 680px; height: 380px; background: radial-gradient(ellipse, rgba(188,140,255,.12) 0%, transparent 70%); pointer-events: none; }
+    .cta-sect .section-title { font-size: clamp(28px,4vw,50px); }
+    .cta-sect .section-sub { margin: 14px auto 36px; text-align: center; }
+    .cta-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 26px; }
+    .btn-store {
+      display: inline-flex; align-items: center; gap: 9px;
+      background: var(--srf); border: 1px solid var(--bdr);
+      color: var(--t1); padding: 13px 24px; border-radius: 12px;
+      font-size: 14px; font-weight: 600; transition: all .2s;
+    }
+    .btn-store:hover { border-color: var(--blue); background: rgba(56,139,253,.08); transform: translateY(-2px); }
+    .cta-deep { font-family: var(--fm); font-size: 12.5px; color: var(--t3); }
+    .cta-deep code { color: var(--blue); background: rgba(56,139,253,.1); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(56,139,253,.2); }
+
+    /* ── FOOTER ────────────────────────────────────── */
+    footer { border-top: 1px solid var(--bdr); padding: 48px 0; }
+    .footer-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 40px; }
+    .footer-brand { max-width: 260px; }
+    .footer-desc { font-size: 13px; color: var(--t3); margin-top: 12px; line-height: 1.6; }
+    .footer-links { display: flex; gap: 48px; }
+    .footer-col h4 { font-family: var(--fm); font-size: 9.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--t3); margin-bottom: 14px; }
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .footer-col a { font-size: 13px; color: var(--t2); transition: color .2s; }
+    .footer-col a:hover { color: var(--t1); }
+    .footer-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--bdr); }
+    .footer-cr { font-size: 12px; color: var(--t3); }
+    .built-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--t3); border: 1px solid var(--bdr); padding: 4px 11px; border-radius: 100px; transition: border-color .2s, color .2s; }
+    .built-badge:hover { border-color: var(--purple); color: var(--t2); }
+
+    /* ── RESPONSIVE ────────────────────────────────── */
+    @media (max-width: 1000px) {
+      .hiw-grid { grid-template-columns: 1fr; }
+      .hiw-conn { display: none; }
+      .feat-card:nth-child(1),
+      .feat-card:nth-child(2) { grid-column: span 1; }
+      .feat-grid { grid-template-columns: repeat(2,1fr); }
+      .feat-card:nth-child(6) { grid-column: 1 / -1; display: block; }
+    }
+    @media (max-width: 768px) {
+      .hero-inner { grid-template-columns: 1fr; gap: 44px; text-align: center; }
+      .hero-visual { order: -1; }
+      .phone { width: 232px; height: 480px; }
+      .hero-ctas, .hero-badges { justify-content: center; }
+      .eyebrow { margin: 0 auto 22px; }
+      .stats-inner { grid-template-columns: repeat(2,1fr); }
+      .stat:nth-child(2) { border-right: none; }
+      .stat:nth-child(3),
+      .stat:nth-child(4) { border-top: 1px solid var(--bdr); }
+      .stat:nth-child(3) { border-right: 1px solid var(--bdr); }
+      .feat-grid { grid-template-columns: 1fr; }
+      .feat-card:nth-child(1),
+      .feat-card:nth-child(2),
+      .feat-card:nth-child(6) { grid-column: span 1; }
+      .feat-card:nth-child(6) { display: block; }
+      .pricing-cards { grid-template-columns: 1fr; }
+      .footer-top { flex-direction: column; }
+      .footer-links { flex-wrap: wrap; gap: 32px; }
+      .footer-bottom { flex-direction: column; gap: 14px; text-align: center; }
+      .nav-links { display: none; }
+      .gh-comment-frame .feat-card:nth-child(6) { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="nav">
+  <div class="container">
+    <div class="nav-inner">
+      <a href="/" class="logo">
+        <div class="logo-grid"><i></i><i></i><i></i><i></i></div>
+        <span class="logo-name">Forge AI</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#how-it-works">How it works</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#">GitHub</a></li>
+      </ul>
+      <a href="#cta" class="btn-nav">Join the Beta</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-dots"></div>
+  <div class="container">
+    <div class="hero-inner">
+      <div>
+        <div class="eyebrow reveal">
+          <span class="eyebrow-dot"></span>
+          <span>GitHub Actions&nbsp;·&nbsp;AI-powered mobile devtool</span>
+        </div>
+        <h1 class="reveal d1">Ship code<br>from <em>anywhere.</em></h1>
+        <p class="hero-sub reveal d2">
+          <span id="typewriter"></span><span id="tw-cursor"></span>
+        </p>
+        <div class="hero-badges reveal d2">
+          <span class="hero-badge green">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Runs on GitHub Actions
+          </span>
+          <span class="hero-badge blue">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Your key stays in GitHub
+          </span>
+        </div>
+        <div class="hero-ctas reveal d3">
+          <a href="#cta" class="btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            Download on App Store
+          </a>
+          <a href="#" class="btn-outline">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+            View on GitHub
+          </a>
+        </div>
+      </div>
+
+      <!-- Phone -->
+      <div class="hero-visual reveal d2">
+        <div class="phone-glow"></div>
+        <div class="phone-wrap">
+          <div class="phone">
+            <div class="dyn-island"></div>
+            <div class="scan-line"></div>
+            <div class="phone-screen">
+              <div class="ph-sb"><span>9:41</span><span style="font-size:8px">●●● ▲</span></div>
+              <div class="ph-hd">
+                <span class="ph-title">Home</span>
+                <div class="ph-bell">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--t2)" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                </div>
+              </div>
+
+              <div class="ph-lbl">Active Tasks</div>
+              <div class="ph-task">
+                <div class="ph-task-top">
+                  <span class="ph-task-name">Fix payment timeout #142</span>
+                  <div class="ph-task-st"><div class="sdot run"></div>Running</div>
+                </div>
+                <div class="ph-meta"><span style="color:var(--t3)">sonnet-4-6 · 1:02</span><span>12.4k tokens</span></div>
+                <div class="ph-bar"><div class="ph-bar-fill" style="width:65%"></div></div>
+              </div>
+
+              <!-- mini timeline inside phone -->
+              <div class="ph-tl">
+                <div class="ph-tl-row">
+                  <span class="ph-tl-ic">●</span>
+                  <span class="ph-tl-txt">Analyzed issue #142</span>
+                  <span class="ph-tl-ck">✓</span>
+                </div>
+                <div class="ph-tl-row">
+                  <span class="ph-tl-ic">▤</span>
+                  <span class="ph-tl-txt">Read payment.ts</span>
+                  <span class="ph-tl-ck">✓</span>
+                </div>
+                <div class="ph-tl-row active">
+                  <span class="ph-tl-ic">✎</span>
+                  <span class="ph-tl-txt" style="color:var(--blue)">Editing paymentService.ts…</span>
+                  <div style="width:6px;height:6px;border-radius:50%;background:var(--blue);animation:pulse-blue 1.5s ease-in-out infinite;box-shadow:0 0 6px rgba(56,139,253,.7)"></div>
+                </div>
+              </div>
+
+              <div class="ph-lbl" style="margin-top:8px">PRs to Review</div>
+              <div class="ph-pr">
+                <div class="ph-pr-ic" style="background:rgba(56,139,253,.14)">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+                </div>
+                <div class="ph-pr-body">
+                  <div class="ph-pr-name">fix: increase payment timeout</div>
+                  <div class="ph-pr-meta"><span class="bdg bdg-g">Low Risk</span><span class="bdg bdg-b">+35 −8</span></div>
+                </div>
+              </div>
+              <div class="ph-pr">
+                <div class="ph-pr-ic" style="background:rgba(188,140,255,.14)">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+                </div>
+                <div class="ph-pr-body">
+                  <div class="ph-pr-name">feat: add retry handler</div>
+                  <div class="ph-pr-meta"><span class="bdg bdg-y">Med Risk</span><span class="bdg bdg-b">+89 −12</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS BAR -->
+<div class="stats-bar reveal">
+  <div class="container">
+    <div class="stats-inner">
+      <div class="stat"><span class="stat-val">$0.02</span><span class="stat-lbl">avg cost per bug fix</span></div>
+      <div class="stat"><span class="stat-val">&lt;15 min</span><span class="stat-lbl">average task completion</span></div>
+      <div class="stat"><span class="stat-val">2</span><span class="stat-lbl">Claude models · Sonnet + Opus</span></div>
+      <div class="stat"><span class="stat-val">0</span><span class="stat-lbl">servers you need to run</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section class="section" id="how-it-works">
+  <div class="container">
+    <span class="section-tag reveal">How it works</span>
+    <h2 class="section-title reveal d1">Three taps to a<br>pull request.</h2>
+    <div class="hiw-grid">
+      <div class="hiw-step reveal d1">
+        <div class="step-num">01</div>
+        <div class="step-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="1.75" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </div>
+        <div class="step-h">Spot the issue</div>
+        <div class="step-p">Browse open GitHub issues right in the app. Forge AI suggests which files are likely affected before you tap Start.</div>
+      </div>
+
+      <div class="hiw-conn reveal d2">
+        <div class="hiw-arr">
+          <div class="hiw-arr-line"></div>
+          <svg width="10" height="10" viewBox="0 0 24 24" stroke="var(--bdr)" stroke-width="2" stroke-linecap="round" fill="none"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </div>
+      </div>
+
+      <div class="hiw-step reveal d2">
+        <div class="step-num">02</div>
+        <div class="step-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <div class="step-h">Dispatch the AI</div>
+        <div class="step-p">Set task type, model, token budget, and constraints. Hit Start — Forge AI triggers a GitHub Actions workflow in your repo, running on GitHub's own servers. Not ours.</div>
+        <div class="actions-badge">
+          <div class="actions-badge-dot"></div>
+          Running on GitHub Actions
+        </div>
+        <div class="mini-tl">
+          <div class="mini-tl-row"><div class="mini-dot" style="background:var(--green)"></div><span>Analyzing issue #142…</span></div>
+          <div class="mini-tl-row"><div class="mini-dot" style="background:var(--blue)"></div><span>Reading payment.ts…</span></div>
+          <div class="mini-tl-row"><div class="mini-dot" style="background:var(--purple);animation:pulse-blue 1.5s ease-in-out infinite"></div><span style="color:var(--blue)">Writing fix… ●</span></div>
+        </div>
+      </div>
+
+      <div class="hiw-conn reveal d3">
+        <div class="hiw-arr">
+          <div class="hiw-arr-line"></div>
+          <svg width="10" height="10" viewBox="0 0 24 24" stroke="var(--bdr)" stroke-width="2" stroke-linecap="round" fill="none"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </div>
+      </div>
+
+      <div class="hiw-step reveal d3">
+        <div class="step-num">03</div>
+        <div class="step-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <div class="step-h">Review &amp; ship</div>
+        <div class="step-p">Push notification when the PR is ready. Review the AI summary, check the risk level, read the diff, approve and merge — all from your phone.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section" id="features" style="border-top:1px solid var(--bdr)">
+  <div class="container">
+    <span class="section-tag reveal">Features</span>
+    <h2 class="section-title reveal d1">Everything your codebase needs,<br>everywhere you go.</h2>
+
+    <div class="feat-outer reveal d2">
+      <div class="feat-grid">
+
+        <!-- 1: Live Task Timeline (1 col) -->
+        <div class="feat-card fa-blue">
+          <div class="feat-icon fi-blue">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          <div class="feat-h">Live Task Timeline</div>
+          <div class="feat-p">The agent narrates every step as a comment on your GitHub issue — files read, edits made, commits pushed. Visible in the app and directly on GitHub.</div>
+        </div>
+
+        <!-- 2: Smart PR Review (2 cols) -->
+        <div class="feat-card fa-green">
+          <div class="feat-icon fi-green">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+          </div>
+          <div class="feat-h">Smart PR Review</div>
+          <div class="feat-p">AI-generated summary of what changed and why. Automatic risk assessment (Low / Medium / High). Full diff with an "important changes only" toggle. One-tap approve &amp; merge.</div>
+        </div>
+
+        <!-- 3: Token Budget (1 col) -->
+        <div class="feat-card fa-yellow">
+          <div class="feat-icon fi-yellow">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+          </div>
+          <div class="feat-h">Token Budget Control</div>
+          <div class="feat-p">Set a max before the task starts. Enforced at the planning stage — the AI scopes its work to fit. Full cost visibility down to the cent.</div>
+        </div>
+
+        <!-- 4: Steer with Comments (1 col) -->
+        <div class="feat-card fa-purple">
+          <div class="feat-icon fi-purple">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <div class="feat-h">Steer with Comments</div>
+          <div class="feat-p">Post a comment on the issue from the app at any point. The agent reads it on its next step and adapts. No proprietary inbox — it's just GitHub.</div>
+        </div>
+
+        <!-- 5: Push Notifications (1 col) -->
+        <div class="feat-card fa-red">
+          <div class="feat-icon fi-red">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+          <div class="feat-h">Push Notifications</div>
+          <div class="feat-p">Task complete, PR ready, AI needs input, budget warning — native push notifications so you never have to poll.</div>
+        </div>
+
+        <!-- 6: GitHub Native, Zero Lock-in (full width) -->
+        <div class="feat-card fa-teal">
+          <div class="feat-left">
+            <div class="feat-icon fi-teal">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+            </div>
+            <div class="feat-h">GitHub Native. Zero Lock-in.</div>
+            <div class="feat-p">Runs entirely on GitHub Actions in your own repo. State lives in your Issues, labels, and PRs. Your Anthropic API key stays in your GitHub secrets. Forge AI stores nothing — no database, no proprietary memory, no vendor dependency.</div>
+          </div>
+          <div class="feat-right">
+            <div class="arch-note">
+              <span class="hi">Issues</span> <span class="dim">→ task input</span><br>
+              <span class="hi">Labels</span> <span class="dim">→ state machine</span><br>
+              <span class="hi">Comments</span> <span class="dim">→ agent memory + timeline</span><br>
+              <span class="hi">PRs</span> <span class="dim">→ output + review</span><br>
+              <span class="hi">GitHub secrets</span> <span class="dim">→ your API key</span>
+            </div>
+            <div class="label-flow" style="margin-top:18px">
+              <span class="lbl-chip pending">forge:pending</span>
+              <span class="label-flow-arr">→</span>
+              <span class="lbl-chip planning">forge:planned</span>
+              <span class="label-flow-arr">→</span>
+              <span class="lbl-chip executing">forge:executing</span>
+              <span class="label-flow-arr">→</span>
+              <span class="lbl-chip pr-ready">forge:pr-created</span>
+              <span class="label-flow-arr">→</span>
+              <span class="lbl-chip done">forge:done</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TERMINAL SHOWCASE -->
+<section class="term-section">
+  <div class="container">
+    <div class="reveal">
+      <span class="section-tag">Live task execution</span>
+      <h2 class="section-title">Every step. Narrated<br>as it happens.</h2>
+      <p class="section-sub" style="max-width:520px">The agent posts its reasoning to your GitHub issue as it works. No black box — every decision is visible in the app and on GitHub.</p>
+    </div>
+
+    <!-- Wrapped in a GitHub comment frame -->
+    <div class="gh-comment-frame reveal d2">
+      <div class="gh-comment-header">
+        <div class="gh-avatar">FA</div>
+        <div style="flex:1">
+          <div class="gh-comment-meta">
+            <strong>forge-ai[bot]</strong>
+            <span style="margin-left:6px;font-size:12px"> commented just now</span>
+          </div>
+          <div class="gh-comment-issue">Issue #142 · fix: payment service timeout</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;font-family:var(--fm);font-size:9px;color:var(--green)">
+          <div style="width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse-green 2s ease-in-out infinite"></div>
+          forge:executing
+        </div>
+      </div>
+
+      <div class="term-window">
+        <div class="term-bar">
+          <div class="td td-r"></div><div class="td td-y"></div><div class="td td-g"></div>
+          <span class="term-title">forge-agent — task #142 — claude-sonnet-4-6</span>
+        </div>
+        <div class="term-tokens">
+          <span class="tok"><strong>12,400</strong> tokens</span>
+          <span class="tok tok-g">·&nbsp;<strong>$0.037</strong></span>
+          <span class="tok" style="color:var(--t3)">·&nbsp;context <strong style="color:var(--t2)">65%</strong></span>
+          <div class="ctx-wrap"><div class="ctx-bar"><div class="ctx-fill"></div></div></div>
+        </div>
+        <div class="term-body">
+          <div class="tl-row"><span class="tl-ic">●</span><span class="tl-txt">Analyzing issue #142</span><span class="tl-t">0:02</span><span class="tl-ck">✓</span></div>
+          <div class="tl-row"><span class="tl-ic">▤</span><span class="tl-txt">src/services/payment.ts</span><span class="tl-t">0:08</span><span class="tl-ck">✓</span></div>
+          <div class="tl-row"><span class="tl-ic">▤</span><span class="tl-txt">src/config/timeouts.ts</span><span class="tl-t">0:14</span><span class="tl-ck">✓</span></div>
+          <div class="tl-row"><span class="tl-ic">◉</span><span class="tl-txt">Planning approach</span><span class="tl-t">0:21</span><span class="tl-ck">✓</span></div>
+          <div class="tl-row"><span class="tl-ic">✎</span><span class="tl-txt">paymentService.ts</span><span class="tl-diff"><span class="add">+24</span>&nbsp;<span class="rem">−6</span></span><span class="tl-t">0:34</span><span class="tl-ck">✓</span></div>
+          <div class="tl-row"><span class="tl-ic">⊙</span><span class="tl-txt">fix: increase payment timeout to 30s</span><span class="tl-t">0:47</span><span class="tl-ck">✓</span></div>
+          <div class="tl-row"><span class="tl-ic">✎</span><span class="tl-txt">retryHandler.ts</span><span class="tl-diff"><span class="add">+11</span>&nbsp;<span class="rem">−2</span></span><span class="tl-t">0:55</span><span class="tl-ck">✓</span></div>
+          <div class="tl-row active">
+            <span class="tl-ic">◉</span>
+            <span class="tl-txt">Reviewing changes…</span>
+            <span class="tl-t">1:02</span>
+            <div class="active-dot"></div>
+          </div>
+        </div>
+        <div class="term-diff">
+          <div class="diff-file">▤ src/services/paymentService.ts</div>
+          <div class="dl ctx"><span class="dl-n">28</span><span class="dl-s">&nbsp;</span><span class="dl-c">async function processPayment(payload: PaymentPayload) {</span></div>
+          <div class="dl rem"><span class="dl-n">29</span><span class="dl-s">−</span><span class="dl-c">&nbsp;&nbsp;const timeout = config.DEFAULT_TIMEOUT; <span style="opacity:.4">// 5000ms</span></span></div>
+          <div class="dl add"><span class="dl-n">29</span><span class="dl-s">+</span><span class="dl-c">&nbsp;&nbsp;const timeout = config.PAYMENT_TIMEOUT ?? 30000;</span></div>
+          <div class="dl ctx"><span class="dl-n">30</span><span class="dl-s">&nbsp;</span><span class="dl-c">&nbsp;&nbsp;return await stripe.charges.create(payload, { timeout });</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="section" id="pricing">
+  <div class="container">
+    <div class="pricing-hd">
+      <span class="section-tag reveal">Pricing</span>
+      <h2 class="section-title reveal d1">Bring your own API key.<br>Pay only for what you use.</h2>
+      <p class="section-sub reveal d2">Forge AI is free. You pay Anthropic directly for token usage.<br>Your key never leaves your GitHub.</p>
+    </div>
+
+    <div class="pricing-cards reveal d2">
+      <div class="p-card feat">
+        <div class="p-name">Forge AI App</div>
+        <div class="p-price">$0</div>
+        <div class="p-price-sub">forever free</div>
+        <ul class="p-features">
+          <li><span class="p-check">✓</span> Unlimited repos</li>
+          <li><span class="p-check">✓</span> All features included</li>
+          <li><span class="p-check">✓</span> Push notifications</li>
+          <li><span class="p-check">✓</span> Runs on GitHub Actions (your quota)</li>
+          <li><span class="p-check">✓</span> iOS &amp; Android</li>
+        </ul>
+      </div>
+      <div class="p-card">
+        <div class="p-name">Anthropic API Usage</div>
+        <div class="p-price" style="font-size:28px;letter-spacing:-.02em">Your key</div>
+        <div class="p-price-sub">billed directly by Anthropic</div>
+        <ul class="p-features">
+          <li><span class="p-dot">·</span><span>Claude Sonnet 4.6 —&nbsp;<span style="font-family:var(--fm);color:var(--green)">~$0.01/task</span> avg</span></li>
+          <li><span class="p-dot">·</span><span>Claude Opus 4.7 —&nbsp;<span style="font-family:var(--fm);color:var(--yellow)">~$0.06/task</span> avg</span></li>
+          <li><span class="p-dot">·</span> Per-task budget caps</li>
+          <li><span class="p-dot">·</span> Full cost transparency</li>
+          <li><span class="p-dot">·</span> Key stored in your GitHub repo secrets</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="pricing-note reveal d3">No markup. No subscriptions. Your API key lives in your GitHub repo — Forge AI never sees it.</p>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-sect" id="cta">
+  <div class="cta-glow"></div>
+  <div class="container" style="position:relative;z-index:1">
+    <span class="section-tag reveal" style="display:block;margin-bottom:18px">Available now</span>
+    <h2 class="section-title reveal d1">Start shipping from<br>your phone.</h2>
+    <p class="section-sub reveal d2">Join the beta. Available on iOS and Android.</p>
+    <div class="cta-btns reveal d3">
+      <a href="#" class="btn-store">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06z"/><path d="M10 2c0 2.5 2 4 4 4s4-1.5 4-4"/></svg>
+        App Store
+      </a>
+      <a href="#" class="btn-store">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        Google Play
+      </a>
+    </div>
+    <p class="cta-deep reveal d4">Already have access? <code>forgeai://onboarding</code></p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a href="/" class="logo"><div class="logo-grid"><i></i><i></i><i></i><i></i></div><span class="logo-name">Forge AI</span></a>
+        <p class="footer-desc">Mobile-first AI coding agent. Runs on GitHub Actions. Your key stays in your GitHub.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <h4>Product</h4>
+          <ul>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#how-it-works">How it works</a></li>
+            <li><a href="#pricing">Pricing</a></li>
+            <li><a href="#">Docs</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Links</h4>
+          <ul>
+            <li><a href="#">GitHub</a></li>
+            <li><a href="#">Twitter / X</a></li>
+            <li><a href="#">Contact</a></li>
+            <li><a href="#">Privacy Policy</a></li>
+            <li><a href="#">Terms</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span class="footer-cr">© 2025 Forge AI. All rights reserved.</span>
+      <a href="#" class="built-badge">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Built with Claude
+      </a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Nav
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => nav.classList.toggle('scrolled', scrollY > 20), { passive: true });
+
+  // Typewriter
+  const phrases = [
+    'Browse issues. Start a task. Get a PR while you sleep.',
+    'The agent runs on GitHub. You approve the merge.',
+    'Async AI coding tasks. No servers required.'
+  ];
+  let pi = 0, ci = 0, del = false;
+  const tw = document.getElementById('typewriter');
+  function type() {
+    const p = phrases[pi];
+    tw.textContent = del ? p.slice(0, ci - 1) : p.slice(0, ci + 1);
+    del ? ci-- : ci++;
+    let ms = del ? 22 : 52;
+    if (!del && ci === p.length) { ms = 2400; del = true; }
+    else if (del && ci === 0) { del = false; pi = (pi + 1) % phrases.length; ms = 380; }
+    setTimeout(type, ms);
+  }
+  type();
+
+  // Scroll reveal
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in'); });
+  }, { threshold: 0.07 });
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>
